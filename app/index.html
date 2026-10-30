@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RTO Guard</title>
+<style>
+:root{
+  --bg:#f6f5f1; --card:#ffffff; --ink:#1d2421; --muted:#68716c; --line:#e4e2db;
+  --brand:#1f5c46; --brand-soft:#e3efe9;
+  --ship:#2f7d57; --ship-bg:#e4f3ea;
+  --nudge:#2b63a6; --nudge-bg:#e5eef9;
+  --confirm:#a86a12; --confirm-bg:#fbf0dc;
+  --hold:#b3372f; --hold-bg:#fbe5e3;
+  --good:#2f7d57; --bad:#b3372f;
+  --radius:12px; --shadow:0 1px 2px rgba(0,0,0,.04),0 2px 8px rgba(0,0,0,.04);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 -apple-system,"Segoe UI",Inter,Roboto,sans-serif}
+header{background:var(--brand);color:#fff;padding:14px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+header h1{font-size:18px;margin:0;font-weight:650;letter-spacing:.2px}
+header .sub{opacity:.8;font-size:13px}
+header .llm{margin-left:auto;font-size:12px;background:rgba(255,255,255,.14);padding:4px 10px;border-radius:99px}
+nav{display:flex;gap:4px;padding:0 24px;background:var(--card);border-bottom:1px solid var(--line);overflow-x:auto}
+nav button{background:none;border:0;border-bottom:2px solid transparent;padding:12px 14px;font:inherit;color:var(--muted);cursor:pointer;white-space:nowrap}
+nav button.on{color:var(--brand);border-color:var(--brand);font-weight:600}
+main{max-width:1200px;margin:0 auto;padding:20px 24px 60px}
+.tab{display:none}.tab.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}
+.row{display:grid;gap:14px}
+.k4{grid-template-columns:repeat(4,1fr)}
+.k2{grid-template-columns:1fr 1fr}
+@media(max-width:860px){.k4{grid-template-columns:1fr 1fr}.k2{grid-template-columns:1fr}}
+h2{font-size:16px;margin:0 0 12px}
+h3{font-size:13px;margin:0 0 6px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+.big{font-size:28px;font-weight:700;letter-spacing:-.5px}
+.muted{color:var(--muted)} .small{font-size:12px}
+.pos{color:var(--good)} .neg{color:var(--bad)}
+.bucket{border-left:4px solid}
+.bucket.ship{border-left-color:var(--ship)} .bucket.nudge{border-left-color:var(--nudge)}
+.bucket.confirm{border-left-color:var(--confirm)} .bucket.hold{border-left-color:var(--hold)}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600;white-space:nowrap}
+.pill.ship{background:var(--ship-bg);color:var(--ship)} .pill.nudge{background:var(--nudge-bg);color:var(--nudge)}
+.pill.confirm{background:var(--confirm-bg);color:var(--confirm)} .pill.hold{background:var(--hold-bg);color:var(--hold)}
+.headline{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:14px}
+.headline .big{font-size:40px}
+select,input,textarea{font:inherit;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);width:100%}
+label{display:block;font-size:12px;color:var(--muted);margin:8px 0 3px}
+button.btn{font:inherit;border:1px solid var(--brand);background:var(--brand);color:#fff;border-radius:8px;padding:7px 14px;cursor:pointer}
+button.btn.ghost{background:#fff;color:var(--brand)}
+button.btn:disabled{opacity:.5;cursor:default}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--muted);font-weight:600;font-size:12px;padding:8px;border-bottom:1px solid var(--line)}
+td{padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+.tablewrap{overflow-x:auto}
+.risk{display:flex;align-items:center;gap:6px;min-width:90px}
+.risk i{display:block;height:6px;border-radius:3px;background:var(--line);flex:1;position:relative;overflow:hidden}
+.risk i b{position:absolute;inset:0 auto 0 0;border-radius:3px}
+.bars{display:flex;gap:3px;height:120px;margin-top:10px;position:relative}
+.bars .col{flex:1;display:flex;flex-direction:column;cursor:pointer}
+.bars .col span{flex:1;display:flex}
+.bars .col span:first-child{align-items:flex-end}
+.bars .col span:last-child{align-items:flex-start}
+.bars .col b{display:block;width:100%;border-radius:2px;min-height:1px}
+.bars::after{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:var(--line)}
+.note{background:var(--brand-soft);border-radius:10px;padding:10px 14px;font-size:13px;margin-top:14px}
+.grid-form{display:grid;grid-template-columns:repeat(3,1fr);gap:0 14px}
+@media(max-width:700px){.grid-form{grid-template-columns:1fr 1fr}}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.chips button{font:inherit;font-size:12px;border:1px solid var(--line);background:#fff;border-radius:99px;padding:4px 10px;cursor:pointer}
+/* chat */
+.phone{background:#e9e1d8;border-radius:16px;padding:12px;height:520px;overflow-y:auto;display:flex;flex-direction:column;gap:8px}
+.msg{max-width:82%;padding:8px 11px;border-radius:10px;white-space:pre-wrap;font-size:13.5px;box-shadow:0 1px 1px rgba(0,0,0,.08)}
+.msg.brand{background:#fff;align-self:flex-start;border-top-left-radius:2px}
+.msg.customer{background:#d8f8c6;align-self:flex-end;border-top-right-radius:2px}
+.msg.system{align-self:center;background:rgba(255,255,255,.65);color:#555;font-size:12px;box-shadow:none;text-align:center}
+.msg time{display:block;font-size:10.5px;color:#888;margin-top:3px;text-align:right}
+.sliders .s{margin-bottom:12px}
+.sliders .s .top{display:flex;justify-content:space-between;font-size:13px}
+.sliders input[type=range]{padding:0;border:0;accent-color:var(--brand)}
+.toggle{display:flex;gap:8px;align-items:flex-start;margin:8px 0;font-size:13px}
+.toggle input{width:auto;margin-top:3px}
+.cmp td:nth-child(n+2),.cmp th:nth-child(n+2){text-align:right;white-space:nowrap}
+.note b,.muted b{white-space:nowrap}
+.reason{font-size:15px;margin:10px 0}
+.err{color:var(--bad);font-size:13px;margin-top:8px}
+</style>
+</head>
+<body>
+<header>
+  <h1>RTO Guard</h1>
+  <span class="sub">Every COD order checked before it ships</span>
+  <span class="llm" id="llm"></span>
+</header>
+<nav>
+  <button data-tab="dash" class="on">Morning dashboard</button>
+  <button data-tab="check">Check an order</button>
+  <button data-tab="wa">WhatsApp simulator</button>
+  <button data-tab="rules">Rules &amp; thresholds</button>
+</nav>
+<main>
+
+<!-- ===================== DASHBOARD ===================== -->
+<section class="tab on" id="dash">
+  <div class="headline">
+    <div>
+      <h3 id="dash-title">Yesterday</h3>
+      <div class="big" id="net-day">—</div>
+      <div class="muted">estimated net ₹ impact vs. shipping every COD order</div>
+    </div>
+    <div style="min-width:200px">
+      <label for="date">Day</label>
+      <select id="date"></select>
+    </div>
+  </div>
+
+  <div class="row k4" id="buckets"></div>
+
+  <div class="row k4" style="margin-top:14px">
+    <div class="card"><h3>Saved from avoided RTOs</h3><div class="big pos" id="saved">—</div><div class="small muted" id="saved-sub"></div></div>
+    <div class="card"><h3>Lost on genuine orders</h3><div class="big neg" id="lost">—</div><div class="small muted" id="lost-sub"></div></div>
+    <div class="card"><h3>Discounts + WhatsApp</h3><div class="big neg" id="costs">—</div><div class="small muted">prepaid discounts and message fees</div></div>
+    <div class="card"><h3>Net ₹ impact</h3><div class="big" id="net2">—</div><div class="small muted" id="net-sub"></div></div>
+  </div>
+
+  <div class="row k2" style="margin-top:14px">
+    <div class="card">
+      <h2>September so far</h2>
+      <div class="muted small" id="mtd-line"></div>
+      <div class="bars" id="bars"></div>
+      <div class="small muted" style="display:flex;justify-content:space-between"><span>1 Sep</span><span>daily net ₹ (click a day)</span><span>30 Sep</span></div>
+    </div>
+    <div class="card">
+      <h2>Reality check</h2>
+      <div id="reality" class="small"></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h2 id="orders-title">Orders</h2>
+    <div class="tablewrap"><table id="orders"></table></div>
+  </div>
+</section>
+
+<!-- ===================== CHECK ===================== -->
+<section class="tab" id="check">
+  <div class="row k2">
+    <div class="card">
+      <h2>Check a new COD order</h2>
+      <div class="chips" id="presets"></div>
+      <div class="grid-form">
+        <div><label>Customer name</label><input id="f-name"></div>
+        <div><label>Phone</label><input id="f-phone"></div>
+        <div><label>Order value (₹)</label><input id="f-value" type="number"></div>
+        <div style="grid-column:1/-1"><label>Address</label><input id="f-address"></div>
+        <div><label>City</label><input id="f-city"></div>
+        <div><label>State</label><input id="f-state"></div>
+        <div><label>Pincode</label><input id="f-pin"></div>
+        <div><label>Past orders</label><input id="f-prior" type="number" min="0"></div>
+        <div><label>Past refused (RTO)</label><input id="f-rto" type="number" min="0"></div>
+        <div><label>Items</label><input id="f-items"></div>
+      </div>
+      <div style="margin-top:14px;display:flex;gap:8px">
+        <button class="btn" id="decide">Decide</button>
+        <button class="btn ghost" id="to-wa" disabled>Send to WhatsApp simulator →</button>
+      </div>
+    </div>
+    <div class="card" id="result"><h2>Decision</h2><div class="muted">Fill in an order or pick an example.</div></div>
+  </div>
+</section>
+
+<!-- ===================== WHATSAPP ===================== -->
+<section class="tab" id="wa">
+  <div class="row k2">
+    <div>
+      <div class="card">
+        <h2>Start a conversation</h2>
+        <label>Order from the selected day (nudge / confirm / hold)</label>
+        <select id="wa-order"></select>
+        <label>Flow</label>
+        <select id="wa-flow">
+          <option value="">Use the engine's decision</option>
+          <option value="nudge">Nudge to prepaid</option>
+          <option value="confirm">Ship after confirmation</option>
+          <option value="hold">Hold (prepaid only)</option>
+        </select>
+        <div style="margin-top:12px"><button class="btn" id="wa-start">Start</button></div>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <h2>Act as the customer</h2>
+        <div class="chips">
+          <button data-r="1">1 (Yes)</button><button data-r="haan ji">haan ji</button>
+          <button data-r="2">2 (No)</button><button data-r="nahi chahiye">nahi chahiye</button>
+          <button data-r="3">3 (Change address)</button>
+          <button data-r="kab tak aayega?">kab tak aayega?</button><button data-r="hmm">hmm</button>
+        </div>
+        <div style="display:flex;gap:8px"><input id="wa-text" placeholder="Type any reply…"><button class="btn" id="wa-send">Send</button></div>
+        <h3 style="margin-top:14px">Time &amp; payments</h3>
+        <div class="chips">
+          <button data-w="4">Wait 4 h</button><button data-w="12">Wait 12 h</button><button data-w="25">Wait 24 h+</button>
+          <button id="wa-pay">💳 Customer pays online</button>
+        </div>
+        <div class="small muted" id="wa-state"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Customer's WhatsApp</h2>
+      <div class="phone" id="phone"><div class="msg system">Start a conversation on the left.</div></div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <h2>Why a ₹<span id="disc-now"></span> prepaid discount?</h2>
+    <div class="small" id="disc-text"></div>
+    <div class="tablewrap"><table id="disc-table" class="cmp" style="margin-top:8px"></table></div>
+  </div>
+</section>
+
+<!-- ===================== RULES ===================== -->
+<section class="tab" id="rules">
+  <div class="row k2">
+    <div class="card sliders">
+      <h2>Risk bands</h2>
+      <div class="small muted" style="margin-bottom:10px">Risk score = % chance this COD order comes back. Drag to change what happens at each level. Nothing is saved until you press Save.</div>
+      <div id="sliders"></div>
+      <h2 style="margin-top:18px">Safety rules</h2>
+      <div id="toggles"></div>
+      <h2 style="margin-top:18px">If the customer never replies (24 h)</h2>
+      <div class="grid-form" style="grid-template-columns:1fr 1fr">
+        <div><label>"Confirm" orders</label><select id="nr-confirm"><option>ship</option><option>cancel</option></select></div>
+        <div><label>"Hold" orders</label><select id="nr-hold"><option>ship</option><option>cancel</option></select></div>
+      </div>
+      <div style="margin-top:16px;display:flex;gap:8px;align-items:center">
+        <button class="btn" id="save">Save rules</button>
+        <button class="btn ghost" id="reset">Undo changes</button>
+        <span class="small muted" id="save-msg"></span>
+      </div>
+      <div class="err" id="rules-err"></div>
+    </div>
+    <div class="card">
+      <h2>What these rules would have done in September</h2>
+      <div class="small muted">September was never used to train the model, so this is an honest test. ₹ "actual" uses what really happened to each order.</div>
+      <div class="tablewrap"><table class="cmp" id="preview" style="margin-top:10px"></table></div>
+      <div class="note" id="preview-note"></div>
+    </div>
+  </div>
+</section>
+</main>
+
+<script>
+const ACTIONS=["ship","nudge","confirm","hold"];
+const LABEL={ship:"Ship as-is",nudge:"Nudge to prepaid",confirm:"Ship after confirmation",hold:"Hold / cancel"};
+const BLURB={ship:"no friction",nudge:"₹ off to pay online",confirm:"must confirm on WhatsApp",hold:"prepaid only, else cancel in 24h"};
+const $=s=>document.querySelector(s);
+const inr=(x,sign)=>{const v=Math.round(x||0);const s=(v<0?"−":(sign&&v>0?"+":""))+"₹"+Math.abs(v).toLocaleString("en-IN");return s};
+const pct=x=>Math.round((x||0)*100)+"%";
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const api=async(path,body)=>{const r=await fetch(path,body?{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}:{});const j=await r.json();if(!r.ok)throw new Error(j.error||r.statusText);return j};
+const riskColor=r=>r<.33?"var(--ship)":r<.6?"var(--nudge)":r<.8?"var(--confirm)":"var(--hold)";
+const riskBar=r=>`<div class="risk"><span>${pct(r)}</span><i><b style="width:${Math.round(r*100)}%;background:${riskColor(r)}"></b></i></div>`;
+
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("on",x===b));
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("on",t.id===b.dataset.tab));
+  if(b.dataset.tab==="rules")loadRules();
+  if(b.dataset.tab==="wa")loadDiscount();
+});
+
+/* ---------------- dashboard ---------------- */
+let DASH=null;
+async function loadDash(date){
+  DASH=await api("/api/dashboard"+(date?"?date="+date:""));
+  const d=DASH.day, m=DASH.month_to_date, scale=DASH.scale_to_real_volume;
+  $("#llm").textContent=DASH.llm?"Gemini on: names & addresses read by AI":"Gemini off: rule-based text checks";
+  const sel=$("#date");
+  if(!sel.options.length){DASH.dates.forEach(x=>sel.add(new Option(new Date(x).toDateString().slice(4),x)));sel.onchange=()=>loadDash(sel.value)}
+  sel.value=DASH.date;
+  const isLast=DASH.date===DASH.dates[DASH.dates.length-1];
+  $("#dash-title").textContent=(isLast?"Yesterday · ":"")+new Date(DASH.date).toDateString();
+  $("#net-day").innerHTML=`<span class="${d.net>=0?"pos":"neg"}">${inr(d.net,1)}</span>`;
+  $("#buckets").innerHTML=ACTIONS.map(a=>`<div class="card bucket ${a}"><h3>${LABEL[a]}</h3><div class="big">${d.buckets[a].orders}</div><div class="small muted">${BLURB[a]}</div></div>`).join("");
+  $("#saved").textContent=inr(d.saved);
+  $("#saved-sub").textContent=`≈ ${d.rtos_avoided.toFixed(1)} returns avoided × ₹${DASH.rto_cost.toFixed(0)}`;
+  $("#lost").textContent=inr(-d.lost_genuine);
+  $("#lost-sub").textContent=`≈ ${d.genuine_lost.toFixed(2)} genuine buyers lost (margin + ₹300 to re-acquire)`;
+  $("#costs").textContent=inr(-(d.discount+d.messaging));
+  $("#net2").innerHTML=`<span class="${d.net>=0?"pos":"neg"}">${inr(d.net,1)}</span>`;
+  $("#net-sub").textContent=`${d.orders} COD orders checked`;
+  $("#mtd-line").innerHTML=`${m.orders} orders · net <b class="${m.net>=0?"pos":"neg"}">${inr(m.net,1)}</b> · at our real volume (~1,650 COD orders/month) ≈ <b>${inr(m.net*scale,1)}</b>/month`;
+  const max=Math.max(...DASH.daily.map(x=>Math.abs(x.net)),1);
+  $("#bars").innerHTML=DASH.daily.map(x=>{
+    const h=Math.abs(x.net)/max*58+"px", c=x.date===DASH.date?"var(--brand)":(x.net>=0?"#9cc9b2":"#e7a39d");
+    const bar=`<b style="height:${h};background:${c}"></b>`;
+    return `<div class="col" title="${x.date}: ${inr(x.net,1)} · ${x.orders} orders" data-d="${x.date}"><span>${x.net>=0?bar:""}</span><span>${x.net<0?bar:""}</span></div>`}).join("");
+  document.querySelectorAll("#bars .col").forEach(b=>b.onclick=()=>loadDash(b.dataset.d));
+  const acted=DASH.orders.filter(o=>o.action!=="ship"), shipped=DASH.orders.filter(o=>o.action==="ship");
+  const rate=a=>a.length?pct(a.filter(o=>o.is_rto).length/a.length):"–";
+  $("#reality").innerHTML=`
+    <p>These are past orders, so we know what really happened:</p>
+    <table class="cmp"><tr><th></th><th>Orders</th><th>Actually returned</th></tr>
+    <tr><td>Shipped as-is (this day)</td><td>${shipped.length}</td><td>${rate(shipped)}</td></tr>
+    <tr><td>Flagged: nudge / confirm / hold</td><td>${acted.length}</td><td>${rate(acted)}</td></tr>
+    <tr><td><b>September to date</b></td><td>${m.orders}</td><td>${pct(m.actual.rto_rate)}</td></tr></table>
+    <p class="muted">Net ₹ using real outcomes, month to date: <b class="${m.actual.net>=0?"pos":"neg"}">${inr(m.actual.net,1)}</b> (estimate said ${inr(m.net,1)}). If these two drift apart, the model needs retraining.</p>`;
+  $("#orders-title").textContent=`Orders on ${new Date(DASH.date).toDateString().slice(4)} (riskiest first)`;
+  $("#orders").innerHTML=`<tr><th>Order</th><th>Customer</th><th>Value</th><th>Risk</th><th>Decision</th><th>Why</th><th>What happened</th><th></th></tr>`+
+    DASH.orders.map(o=>`<tr><td>${o.order_id}<div class="small muted">${o.order_datetime.slice(11)}</div></td>
+      <td>${esc(o.customer_name)}<div class="small muted">${esc(o.city)}, ${esc(o.state)}</div></td>
+      <td>${inr(o.order_value)}</td><td>${riskBar(o.risk)}</td>
+      <td><span class="pill ${o.action}">${LABEL[o.action]}</span></td>
+      <td class="small">${esc(o.reason)}</td>
+      <td class="small">${o.is_rto?'<span class="neg">Returned</span>':'<span class="pos">Delivered</span>'}</td>
+      <td>${o.action!=="ship"?`<button class="btn ghost small" data-wa="${o.order_id}">WhatsApp</button>`:""}</td></tr>`).join("");
+  document.querySelectorAll("[data-wa]").forEach(b=>b.onclick=()=>{fillWaOrders();$("#wa-order").value=b.dataset.wa;document.querySelector('[data-tab=wa]').click();startWa()});
+  fillWaOrders();
+}
+
+/* ---------------- check an order ---------------- */
+const PRESETS={
+  "Hinglish address, Bihar, 1st order":{name:"Riya Mehta",phone:"9503105968",value:1197,address:"gali no 22 ke andar, Petrol Pump ke paas",city:"Patna",state:"Bihar",pin:"800033",prior:0,rto:0,items:"Rice Water Shampoo Bar|Hair Oil 100ml"},
+  "Junk address":{name:"Sneha Iyer",phone:"9337753741",value:749,address:"xyz",city:"Bengaluru",state:"Karnataka",pin:"560035",prior:0,rto:0,items:"Satin Bonnet"},
+  "Fake name":{name:"asdf",phone:"7480851912",value:499,address:"House No. 380, Sector 24, near Water Tank",city:"Jaipur",state:"Rajasthan",pin:"302041",prior:0,rto:0,items:"Claw Clip Set"},
+  "Loyal customer":{name:"Divya Pillai",phone:"7473750907",value:1996,address:"Flat 408, Royal Apartments, Mall Road",city:"Kolkata",state:"West Bengal",pin:"700075",prior:3,rto:0,items:"Microfiber Hair Towel|Satin Bonnet"},
+  "Serial refuser":{name:"Amit Kaur",phone:"9354383414",value:899,address:"784/17, MG Nagar, Opp. Hanuman Mandir",city:"Gorakhpur",state:"Uttar Pradesh",pin:"273001",prior:4,rto:2,items:"Hair Oil 100ml|Satin Bonnet"},
+  "Metro, complete address":{name:"Neha Mishra",phone:"7581731174",value:798,address:"B-597, Sunrise Society, Gandhi Marg",city:"Mumbai",state:"Maharashtra",pin:"400033",prior:0,rto:0,items:"Satin Bonnet|Hair Oil 100ml"},
+};
+const F=["name","phone","value","address","city","state","pin","prior","rto","items"];
+$("#presets").innerHTML=Object.keys(PRESETS).map(k=>`<button>${k}</button>`).join("");
+document.querySelectorAll("#presets button").forEach(b=>b.onclick=()=>{const p=PRESETS[b.textContent];F.forEach(f=>$("#f-"+f).value=p[f]);decide()});
+let LAST_ORDER=null, LAST_ACTION=null;
+function formOrder(){return{order_id:"NEW"+Date.now().toString().slice(-4),customer_name:$("#f-name").value,phone:$("#f-phone").value,order_value:+$("#f-value").value||0,address:$("#f-address").value,city:$("#f-city").value,state:$("#f-state").value,pincode:$("#f-pin").value||null,customer_prior_orders:+$("#f-prior").value||0,customer_prior_rto:+$("#f-rto").value||0,items:$("#f-items").value||"Hair Oil 100ml",order_datetime:new Date().toISOString().slice(0,16).replace("T"," ")}}
+async function decide(){
+  const o=formOrder();
+  try{
+    const r=await api("/api/decide",{order:o});LAST_ORDER=o;LAST_ACTION=r.action;
+    $("#to-wa").disabled=r.action==="ship";
+    const best=ACTIONS.reduce((a,b)=>r.options[b].net>r.options[a].net?b:a);
+    $("#result").innerHTML=`<h2>Decision</h2>
+      <span class="pill ${r.action}" style="font-size:15px;padding:5px 14px">${r.label}</span>
+      <div class="reason">${esc(r.reason)}</div>
+      <div class="small muted">Address read as <b>${r.address_quality}</b>${r.hinglish?" (Hinglish)":""} · text checked by <b>${r.text_source==="gemini"?"Gemini":"rules"}</b></div>
+      <h3 style="margin-top:16px">₹ effect of each option on this order</h3>
+      <table class="cmp"><tr><th>Option</th><th>RTO loss avoided</th><th>Genuine sale at risk</th><th>Discount + msg</th><th>Net</th></tr>
+      ${ACTIONS.map(a=>{const x=r.options[a];return`<tr${a===r.action?' style="font-weight:600"':""}><td><span class="pill ${a}">${x.label}</span></td><td>${inr(x.saved)}</td><td>${inr(-x.lost_genuine)}</td><td>${inr(-(x.discount+x.messaging))}</td><td class="${x.net>=0?"pos":"neg"}">${inr(x.net,1)}</td></tr>`}).join("")}</table>
+      <div class="small muted" style="margin-top:8px">${best!==r.action?`Pure ₹ maths prefers <b>${LABEL[best]}</b>; the safety rules in Settings chose <b>${r.label}</b>${r.rule?": "+esc(r.rule):""}.`:"The decision is also the best option in pure ₹ terms."}</div>`;
+  }catch(e){$("#result").innerHTML=`<h2>Decision</h2><div class="err">${esc(e.message)}</div>`}
+}
+$("#decide").onclick=decide;
+$("#to-wa").onclick=async()=>{document.querySelector('[data-tab=wa]').click();const c=await api("/api/wa/start",{order:LAST_ORDER,flow:LAST_ACTION});showConv(c)};
+
+/* ---------------- whatsapp ---------------- */
+let CONV=null;
+function fillWaOrders(){
+  if(!DASH)return;const sel=$("#wa-order"),cur=sel.value;
+  const rows=DASH.orders.filter(o=>o.action!=="ship");
+  sel.innerHTML=rows.map(o=>`<option value="${o.order_id}">${o.order_id} · ${esc(o.customer_name)} · ${esc(o.city)} · ${LABEL[o.action]}</option>`).join("")||"<option value=''>No flagged orders on this day</option>";
+  if(cur&&rows.some(o=>o.order_id===cur))sel.value=cur;
+}
+async function startWa(){if(!$("#wa-order").value)return;showConv(await api("/api/wa/start",{order_id:$("#wa-order").value,flow:$("#wa-flow").value||undefined}))}
+function showConv(c){
+  CONV=c;
+  $("#phone").innerHTML=c.messages.map(m=>`<div class="msg ${m.sender}">${esc(m.text)}<time>${m.at}</time></div>`).join("");
+  $("#phone").scrollTop=1e9;
+  const lang={hi:"Hinglish",en:"English"}[c.lang];
+  $("#wa-state").innerHTML=`Order ${c.order.order_id} · flow <b>${c.flow}</b> · language <b>${lang}</b> · state <b>${c.state.replace(/_/g," ")}</b>${c.outcome?` · outcome <b>${c.outcome.replace(/_/g," ")}</b>`:""}`;
+}
+$("#wa-start").onclick=startWa;
+const send=async t=>{if(!CONV||!t)return;showConv(await api("/api/wa/reply",{id:CONV.id,text:t}));$("#wa-text").value=""};
+$("#wa-send").onclick=()=>send($("#wa-text").value);
+$("#wa-text").onkeydown=e=>{if(e.key==="Enter")send($("#wa-text").value)};
+document.querySelectorAll("[data-r]").forEach(b=>b.onclick=()=>send(b.dataset.r));
+document.querySelectorAll("[data-w]").forEach(b=>b.onclick=async()=>{if(CONV)showConv(await api("/api/wa/wait",{id:CONV.id,hours:+b.dataset.w}))});
+$("#wa-pay").onclick=async()=>{if(CONV)showConv(await api("/api/wa/pay",{id:CONV.id}))};
+
+async function loadDiscount(){
+  const d=await api("/api/discount");$("#disc-now").textContent=d.discount;
+  const be=r=>d.points.find(p=>Math.abs(p.risk-r)<.001).break_even;
+  $("#disc-text").innerHTML=`An RTO costs us ₹${DASH.rto_cost.toFixed(0)} (₹65 + ₹65 shipping, ₹25 handling, 8% × ₹180 damaged stock). When a COD customer switches to prepaid, their chance of returning drops from their risk score to 4%.
+   So the most we can afford to give a switcher is <b>(risk − 4%) × ₹${DASH.rto_cost.toFixed(0)} ÷ 96%</b>. This counts only the RTO cost avoided, not any extra sales, so it's deliberately cautious.
+   At 35% risk that's ₹${be(.35).toFixed(0)}, which is why <b>₹${d.discount} pays for itself from about 33% risk upward</b>, exactly where the nudge band starts. Below that we'd be paying people who were going to accept the parcel anyway.
+   The discount is capped at 10% of the order so a ₹299 order gets ₹30, not ₹50.`;
+  $("#disc-table").innerHTML=`<tr><th>Risk score</th>${d.points.filter((_,i)=>i%2===1).map(p=>`<th>${pct(p.risk)}</th>`).join("")}</tr>
+    <tr><td>Break-even discount</td>${d.points.filter((_,i)=>i%2===1).map(p=>`<td class="${p.break_even>=d.discount?"pos":"neg"}">${inr(p.break_even)}</td>`).join("")}</tr>`;
+}
+
+/* ---------------- rules ---------------- */
+let CFG=null, DRAFT=null, timer=null;
+const SLIDERS=[
+  ["risk_bands","ship_below","Ship as-is below","%",5,95],
+  ["risk_bands","nudge_below","Nudge to prepaid below","%",5,95],
+  ["risk_bands","confirm_below","Confirm on WhatsApp below (above = Hold)","%",5,100],
+  ["prepaid_nudge","discount_rupees","Prepaid discount","₹",0,150],
+  ["prepaid_nudge","expected_take_up_percent","Expected prepaid take-up","%",0,60],
+  ["economics","confirmation_catches_rto_percent","Share of RTOs a confirmation stops","%",0,80],
+];
+const TOGGLES=[
+  ["always_ship_loyal_customers","Always ship repeat customers who never refused a parcel"],
+  ["protect_first_time_customers","Never HOLD a first-time buyer on risk score alone (protects ad spend)"],
+  ["confirm_if_address_unusable","Junk address → WhatsApp asks for the full address first"],
+  ["confirm_if_name_looks_fake","Fake-looking name → needs WhatsApp confirmation"],
+];
+async function loadRules(){
+  CFG=await api("/api/config");DRAFT=JSON.parse(JSON.stringify(CFG));
+  $("#sliders").innerHTML=SLIDERS.map(([s,k,l,u,min,max])=>`<div class="s"><div class="top"><span>${l}</span><b id="v-${k}"></b></div><input type="range" min="${min}" max="${max}" data-s="${s}" data-k="${k}"></div>`).join("");
+  $("#toggles").innerHTML=TOGGLES.map(([k,l])=>`<label class="toggle"><input type="checkbox" data-t="${k}"> <span>${l}</span></label>`).join("");
+  document.querySelectorAll("[data-s]").forEach(el=>{el.value=DRAFT[el.dataset.s][el.dataset.k];el.oninput=()=>{DRAFT[el.dataset.s][el.dataset.k]=+el.value;paint();queue()}});
+  document.querySelectorAll("[data-t]").forEach(el=>{el.checked=DRAFT.safety_rules[el.dataset.t];el.onchange=()=>{DRAFT.safety_rules[el.dataset.t]=el.checked;queue()}});
+  $("#nr-confirm").value=DRAFT.whatsapp.confirm_no_reply_action;$("#nr-hold").value=DRAFT.whatsapp.hold_no_reply_action;
+  $("#nr-confirm").onchange=e=>{DRAFT.whatsapp.confirm_no_reply_action=e.target.value};
+  $("#nr-hold").onchange=e=>{DRAFT.whatsapp.hold_no_reply_action=e.target.value};
+  paint();preview();
+}
+function paint(){SLIDERS.forEach(([s,k,,u])=>$("#v-"+k).textContent=u==="₹"?"₹"+DRAFT[s][k]:DRAFT[s][k]+"%")}
+function queue(){clearTimeout(timer);timer=setTimeout(preview,250)}
+function payload(){return{risk_bands:DRAFT.risk_bands,prepaid_nudge:DRAFT.prepaid_nudge,economics:{confirmation_catches_rto_percent:DRAFT.economics.confirmation_catches_rto_percent},safety_rules:DRAFT.safety_rules,whatsapp:{confirm_no_reply_action:DRAFT.whatsapp.confirm_no_reply_action,hold_no_reply_action:DRAFT.whatsapp.hold_no_reply_action}}}
+async function preview(){
+  $("#rules-err").textContent="";
+  try{
+    const r=await api("/api/config/preview",{config:payload()}),c=r.current,p=r.proposed;
+    const row=(l,f,money)=>`<tr><td>${l}</td><td>${money?inr(f(c),1):f(c)}</td><td><b>${money?inr(f(p),1):f(p)}</b></td></tr>`;
+    $("#preview").innerHTML=`<tr><th></th><th>Saved rules</th><th>Your draft</th></tr>`+
+      ACTIONS.map(a=>row(LABEL[a],x=>x.buckets[a].orders)).join("")+
+      row("RTOs avoided (est.)",x=>x.rtos_avoided.toFixed(0))+
+      row("Saved from RTOs",x=>x.saved,1)+row("Lost on genuine orders",x=>-x.lost_genuine,1)+
+      row("Discounts + messages",x=>-(x.discount+x.messaging),1)+row("<b>Net (estimate)</b>",x=>x.net,1)+row("<b>Net (actual outcomes)</b>",x=>x.actual.net,1);
+    const scale=DASH?DASH.scale_to_real_volume:5;
+    $("#preview-note").innerHTML=`At our real volume (~1,650 COD orders/month) the draft is worth about <b>${inr(p.actual.net*scale,1)}</b>/month vs. shipping everything (saved rules: ${inr(c.actual.net*scale,1)}).`;
+  }catch(e){$("#rules-err").textContent=e.message}
+}
+$("#save").onclick=async()=>{try{await api("/api/config/save",{config:payload()});$("#save-msg").textContent="Saved to config/rules.yaml ✓";await loadRules();await loadDash($("#date").value)}catch(e){$("#rules-err").textContent=e.message}};
+$("#reset").onclick=loadRules;
+
+// Deep links: #check, #wa, #rules open that tab with an example loaded.
+loadDash().then(async()=>{
+  const tab=location.hash.slice(1);
+  const btn=document.querySelector(`nav [data-tab="${tab}"]`);
+  if(!btn)return;
+  btn.click();
+  if(tab==="check")document.querySelector("#presets button").click();
+  if(tab==="wa"){
+    const nudge=DASH.orders.find(o=>o.action==="nudge");
+    if(nudge)$("#wa-order").value=nudge.order_id;
+    await startWa();await send("kab tak aayega?");await send("haan ji");
+  }
+});
+</script>
+</body>
+</html>

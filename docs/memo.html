@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>COD Returns Memo</title>
+<style>
+@page{size:A4;margin:13mm 15mm 12mm}
+*{box-sizing:border-box}
+body{font:9.6pt/1.42 "Segoe UI",Inter,Roboto,Arial,sans-serif;color:#1d2421;margin:0}
+.head{border-bottom:2px solid #1f5c46;padding-bottom:6px;margin-bottom:9px;display:flex;justify-content:space-between;align-items:flex-end}
+.head h1{font-size:15pt;margin:0;color:#1f5c46;letter-spacing:-.2px}
+.meta{font-size:8.6pt;color:#555;text-align:right;line-height:1.35}
+h2{font-size:10.6pt;color:#1f5c46;margin:11px 0 4px;padding-bottom:2px;border-bottom:1px solid #dfe7e3}
+p{margin:3px 0 5px}
+ul,ol{margin:3px 0 5px;padding-left:17px}
+li{margin:1.5px 0}
+.tldr{background:#eef5f1;border-left:4px solid #1f5c46;padding:7px 11px;border-radius:4px;margin-bottom:4px}
+.tldr p{margin:2px 0}
+table{border-collapse:collapse;width:100%;font-size:8.9pt;margin:4px 0 6px}
+th,td{padding:3px 6px;border-bottom:1px solid #e3e3e3;text-align:left;vertical-align:top}
+th{background:#f4f6f5;font-weight:600}
+td.n,th.n{text-align:right;white-space:nowrap}
+.pos{color:#23744d;font-weight:600}.neg{color:#b3372f;font-weight:600}
+.small{font-size:8.3pt;color:#555}
+b{font-weight:650}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.pb{break-before:page}
+</style>
+</head>
+<body>
+
+<div class="head">
+  <h1>COD returns: check risky orders, don't cancel them</h1>
+  <div class="meta">To: Founder · From: [Your Name]<br>30 Oct 2026 · Associate Software Engineer take-home</div>
+</div>
+
+<div class="tldr">
+<p><b>Bottom line.</b> Most "risky" COD orders still make us money when they arrive. So the answer to RTO is to <b>check, nudge and confirm</b>, and cancel almost nothing.
+I tested three policies on <b>September</b>, a month the system never saw while learning:</p>
+<table style="margin:4px 0 2px">
+<tr><th>Policy (Sept: 329 COD orders, 86 came back)</th><th class="n">Net ₹ vs. today</th><th class="n">At our volume (~1,650 COD/month)</th></tr>
+<tr><td>Marketing: ship every COD order (today)</td><td class="n">₹0</td><td class="n">₹0</td></tr>
+<tr><td>Operations: auto-cancel orders with ≥40% risk</td><td class="n neg">−₹16,345</td><td class="n neg">≈ −₹82,000 / month</td></tr>
+<tr><td>Operations: stop COD in pincodes with bad history</td><td class="n neg">−₹16,883</td><td class="n neg">≈ −₹85,000 / month</td></tr>
+<tr><td><b>Recommended: RTO Guard rules</b></td><td class="n pos">+₹2,023</td><td class="n pos">≈ +₹10,000 / month</td></tr>
+</table>
+<p class="small">"Net" = RTO losses avoided − margin lost on genuine buyers we turned away (incl. ₹300 to replace a customer) − prepaid discounts − WhatsApp costs. It uses what actually happened to each order. The +₹10k is a cautious, small first step; I've set out below how to grow it.</p>
+</div>
+
+<h2>1. What surprised me in the data (1,987 usable orders, Apr–Sep)</h2>
+<ol>
+<li><b>"Bad pincodes" are mostly bad luck.</b> We have 1,066 pincodes for 1,987 orders, and the median pincode has just <b>1 order</b>. The 157 pincodes that looked terrible from April to August (≥50% RTO) had a <b>26% RTO in September</b>, exactly the overall average. Blocking COD there would have refused 39 orders, saved ₹1,694 and thrown away ₹18,577 of genuine sales. And 30% of September orders came from pincodes we had never seen before. <b>City and town size</b> do matter: metros 22% RTO vs. small towns like Darbhanga, Gorakhpur and Bareilly 53%.</li>
+<li><b>At our margins a risky order is usually worth shipping.</b> A delivered ₹649 order earns ~₹337 (62% margin minus ₹65 shipping). An RTO costs ₹169 (₹65 + ₹65 + ₹25 + 8% damaged × ₹180). So shipping pays until the chance of return passes <b>67%</b>, or <b>79%</b> if we count the ₹300 it costs to win that customer back. Cancelling a 40%-risk ₹649 order throws away about ₹135 of expected profit (60% × ₹337 − 40% × ₹169).</li>
+<li><b>Hinglish isn't the problem. Junk is.</b> Landmark-style Hinglish addresses ("gali no 22 ke andar, Petrol Pump ke paas") come back 31% of the time, close to normal. Junk addresses ("xyz", ".", "home", only a city name; 153 orders, 8%) come back <b>64%</b>. Fake names ("asdf", "test") also come back 64%, but <b>1 in 3 of them was a real buyer who accepted the parcel</b>, so we should confirm them, not cancel them.</li>
+<li><b>History beats everything.</b> Repeat customers who never refused: <b>14%</b> RTO. First orders: 30%. Customers who refused 2+ times before: <b>76%</b>. First orders from Meta ads are the riskiest group (34% vs. 28% from other channels), so Operations has a point about where the risk comes from.</li>
+<li><b>The data needs a clean-up before we trust any dashboard.</b> I found 30 duplicate rows, the status written 6 different ways, 11 "Test Order" rows mixed into sales and 17 phone numbers cut to 9 digits. The average COD order in this file is <b>₹920, not the ₹649</b> in the brief. Every ₹ figure depends on order value, so we should confirm which is right.</li>
+</ol>
+
+<h2>2. Recommended rules, and what they would have done last month</h2>
+<p>Every order gets a <b>risk score</b>: the % chance it comes back. It's built from customer history, city return rate, address and name quality, phone validity and order size. The score then sets the action (Ops can change every number on the dashboard's Rules page, no code needed):</p>
+<table>
+<tr><th>Rule</th><th class="n">Sept orders</th><th class="n">Actually returned</th><th>Why this band</th></tr>
+<tr><td><b>Ship as-is</b>: risk under 33%, or a repeat buyer who never refused</td><td class="n">245 (74%)</td><td class="n">18%</td><td>No friction for 3 in 4 customers</td></tr>
+<tr><td><b>Nudge to prepaid</b> (₹50 off; one tap still confirms COD): 33–60%</td><td class="n">52</td><td class="n">35%</td><td>₹50 pays for itself from 33% risk up</td></tr>
+<tr><td><b>Confirm on WhatsApp</b> first: 60–80%, junk address (we ask for the full one), or fake name</td><td class="n">26</td><td class="n">69%</td><td>Cheap (₹1); filters out people who never meant to buy</td></tr>
+<tr><td><b>Hold</b> (prepaid only, cancel after 24h): 80%+ (first-time buyers only with hard evidence like a fake name), or refused 2+ COD orders</td><td class="n">6</td><td class="n">100%</td><td>Only where cancelling beats shipping</td></tr>
+</table>
+<p>The flagged orders really were the risky ones: 18% of shipped orders came back vs. 35–100% of flagged ones. In September the rules avoided about <b>20 of 86 RTOs</b> (₹3,421) for ₹862 of genuine sales put at risk and ₹536 in discounts and messages.</p>
+
+<h2>3. Operations vs. Marketing: the ₹ exchange rate</h2>
+<p>Both leaders are right about something, and the maths says how to weigh them. <b>Wrongly turning away one genuine first-time buyer costs ~₹637</b> (₹337 margin + ₹300 to re-acquire). <b>One avoided RTO saves ₹169.</b> So stopping 1 good customer costs as much as <b>3.8 returns</b>. Cancellation only pays when we're very sure the order is bad, and that's rare. That decided how each side's concern is handled:</p>
+<div class="two">
+<div><b>For Operations</b>
+<ul><li>Serial refusers (2+ RTOs, 76% return rate) can only pay online.</li>
+<li>No parcel leaves without an address a courier can find.</li>
+<li>High-risk orders must confirm. A "no" cancels <i>before</i> we pay ₹130 in shipping.</li></ul></div>
+<div><b>For Marketing</b>
+<ul><li>First-time buyers are never held on score alone. The worst they get is a WhatsApp check.</li>
+<li>Loyal customers always ship.</li>
+<li>Risky buyers get a <i>discount</i>, not a cancellation, and the order stays COD if they want.</li></ul></div>
+</div>
+<p>If Operations' "cancel anything risky" had run in September, it would have cancelled 61 orders. 27 of them would have been delivered, and that cost <b>₹22,105</b> in lost sales and customers to save ₹5,760 in returns.</p>
+
+<h2>4. What could go wrong, and how we'd notice</h2>
+<ul>
+<li><b>My assumptions could be wrong.</b> I assumed a confirmation stops 35% of would-be RTOs, 20% of nudged customers switch to prepaid, and 3% of genuine buyers drop off when asked. If confirmations stop 25% and only 10% switch, we still make ~₹7k/month. If they stop 50% and 30% switch, ~₹14k. <b>Fix:</b> for 4 weeks, ship 10% of flagged orders as-is as a control group, and measure the real numbers.</li>
+<li><b>The model goes stale.</b> A sale, a new region or a new courier changes who returns. The dashboard's "Reality check" puts <i>estimated</i> ₹ next to <i>actual</i> ₹. If they drift apart for 2 weeks, retrain (one command, under a minute).</li>
+<li><b>WhatsApp fails quietly.</b> Template rejected, number blocked, low read rates. Track delivery and read rates, and alert if "no reply" goes above ~40%.</li>
+<li><b>Customers learn to game the discount</b> (pick COD to get ₹50 off). Only offer it from 33% risk, once per phone number, and watch the overall COD share.</li>
+<li><b>We start penalising small towns.</b> The rules add friction in Bihar and UP but never cancel on location alone. Review the cancel and confirm rates by state each month.</li>
+<li><b>The AI misreads an address.</b> It only labels name and address quality; it never makes the decision. If it fails, the rules take over. Check a weekly sample of its labels.</li>
+<li><b>Small sample.</b> September had 329 orders, so the ₹ figures show direction, not precision.</li>
+</ul>
+
+<h2>5. With two more weeks</h2>
+<ol>
+<li><b>Go live as a measured test</b>: Shopify order webhook → RTO Guard → WhatsApp provider (Interakt/WATI/Gupshup) + Razorpay payment links, with the 10% control group. This turns my guesses into our own numbers.</li>
+<li><b>Offer prepaid at checkout</b>, before the order exists. That's cheaper than after, and it's where most of the remaining money is.</li>
+<li><b>Courier × area</b>: Xpressbees runs at 31% RTO vs. Delhivery 26%. Check whether routing by area cuts returns at no cost to the customer.</li>
+<li><b>Phone-level memory</b>: 364 phone numbers appear on more than one order. Link them so a refusal on one order counts for the next.</li>
+<li><b>Failed-delivery follow-up</b>: when the courier marks "customer not available", send a WhatsApp to reschedule before the parcel turns around.</li>
+</ol>
+<p class="small">Everything here can be reproduced: <code>python scripts/analyze.py</code> (findings) and <code>python scripts/backtest.py</code> (September). The decision log explains each choice and the alternatives I rejected.</p>
+</body>
+</html>

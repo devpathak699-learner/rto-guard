@@ -1,0 +1,108 @@
+# =====================================================================
+#  RTO GUARD — BUSINESS RULES
+#  This is the only file Operations / Marketing need to edit.
+#  You can also change these numbers from the "Settings" page of the
+#  dashboard (it writes this file for you and shows the ₹ impact live).
+#
+#  Rules of thumb:
+#   * Percentages are written as whole numbers (35 means 35%).
+#   * Rupee amounts are plain numbers (65 means ₹65).
+#   * Lines starting with # are notes and are ignored.
+# =====================================================================
+
+# ---------------------------------------------------------------------
+# 1. RISK BANDS — what we do with an order based on its RTO risk score
+#    (the risk score = the % chance this COD order comes back)
+# ---------------------------------------------------------------------
+risk_bands:
+  # Below this risk we just ship it. No message, no friction.
+  ship_below: 33
+
+  # From "ship_below" up to this number we offer a prepaid discount
+  # on WhatsApp (customer can still choose COD by tapping "Confirm COD").
+  nudge_below: 60
+
+  # From "nudge_below" up to this number the customer MUST confirm
+  # on WhatsApp before we ship.
+  confirm_below: 80
+
+  # At or above "confirm_below" the order is put on HOLD:
+  # we ask for prepaid or a corrected address. No answer in 24h = cancel.
+
+# ---------------------------------------------------------------------
+# 2. SAFETY RULES — these override the risk score
+# ---------------------------------------------------------------------
+safety_rules:
+  # Repeat customers who have never returned an order always ship as-is.
+  always_ship_loyal_customers: true
+  loyal_min_delivered_orders: 1
+
+  # Customers who refused this many past orders get HOLD (prepaid only).
+  hold_if_past_rtos_at_least: 2
+
+  # Junk address ("xyz", ".", "home", only a city name) = at least
+  # "confirm on WhatsApp", and the message asks for the full address.
+  # We never ship until we have an address the courier can find.
+  # (Not HOLD: 36% of these customers were genuine and did take delivery.)
+  confirm_if_address_unusable: true
+
+  # Fake-looking name ("test", "asdf") = at least "confirm on WhatsApp".
+  # (Almost half of these still got delivered, so we do NOT auto-cancel.)
+  confirm_if_name_looks_fake: true
+
+  # First-time customers are never put on HOLD on risk score alone —
+  # only if there is hard evidence (junk address / fake name + high risk).
+  # This protects the ₹300+ we paid Meta to get them.
+  protect_first_time_customers: true
+
+
+# ---------------------------------------------------------------------
+# 3. PREPAID NUDGE
+# ---------------------------------------------------------------------
+prepaid_nudge:
+  discount_rupees: 50          # flat ₹ off if the customer pays online
+  max_discount_percent: 10     # never more than this % of the order value
+  expected_take_up_percent: 20 # % of nudged customers we expect to switch
+
+# ---------------------------------------------------------------------
+# 4. WHATSAPP TIMING
+# ---------------------------------------------------------------------
+whatsapp:
+  brand_name: KT Haircare        # shown in every customer message
+  quiet_hours_start: 21        # don't message between 9 pm ...
+  quiet_hours_end: 9           # ... and 9 am (queued until 9 am)
+  first_reminder_after_hours: 4
+  second_reminder_after_hours: 20
+  give_up_after_hours: 24
+  # What to do if a "confirm" customer never replies in 24h:
+  #   ship   -> ship anyway (the maths says this still makes money on average)
+  #   cancel -> cancel the order
+  confirm_no_reply_action: ship
+  hold_no_reply_action: cancel
+
+# ---------------------------------------------------------------------
+# 5. MONEY ASSUMPTIONS (used for every ₹ number on the dashboard)
+# ---------------------------------------------------------------------
+economics:
+  forward_shipping: 65
+  return_shipping: 65
+  packaging_handling: 25
+  damaged_on_return_percent: 8
+  avg_product_cost: 180
+  gross_margin_percent: 62
+  # Margin on a delivered order = gross margin - forward shipping.
+  prepaid_rto_percent: 4
+  whatsapp_cost_per_order: 1        # ~3 utility messages + tooling
+  # What it costs to replace a customer we wrongly turn away
+  # (Marketing's Meta acquisition cost). Not counted for customers who have
+  # already refused one of our parcels.
+  new_customer_acquisition_cost: 300
+  # Of the orders that WOULD have been returned, what share does a WhatsApp
+  # confirmation stop before we ship? (assumption — measure it in week 1)
+  confirmation_catches_rto_percent: 35
+  # Of genuine customers asked to confirm, what share drop off? (assumption)
+  confirmation_loses_genuine_percent: 3
+  # HOLD asks for prepaid or a corrected address and cancels if no answer.
+  # Share of would-be RTOs it stops, and share of genuine buyers we lose.
+  hold_catches_rto_percent: 90
+  hold_loses_genuine_percent: 40
